@@ -26,14 +26,14 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --features test-fixtures -- -D warnings
 
   test:
     name: Test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, ubuntu-26.04-arm, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -45,7 +45,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Test
-        run: cargo test --locked
+        run: cargo test --locked --features test-fixtures
 
       - name: Release build
         run: cargo build --release --locked

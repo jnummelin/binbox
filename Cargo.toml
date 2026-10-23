@@ -8,3 +8,11 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 tempfile = "3.27.0"
 zip = "9.0.5"
+
+[features]
+test-fixtures = []
+
+[[bin]]
+name = "test-tool"
+path = "tests/fixtures/tool.rs"
+required-features = ["test-fixtures"]
