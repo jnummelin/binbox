@@ -45,12 +45,24 @@ For example, using kubectl and helm:
 ```shell
 zip tools.zip kubectl helm
 cat target/release/binbox tools.zip > mybox
+zip -A mybox
 chmod +x mybox
 ```
 
 That's it! `mybox` is now a self-contained executable containing the tools you bundled.
 
+The `zip -A` step adjusts ZIP offsets to account for the executable prefix.
+Without it, the ZIP reader can mistake signature bytes inside the executable for archive metadata.
+
 **Note:** The bundled executables must be compatible with the target operating system and architecture. Any external shared-library dependencies must also be available at runtime.
+
+## Testing
+
+```shell
+cargo test --features test-fixtures
+```
+
+The `test-fixtures` feature builds the echo-like test tool and enables the bundled-tool integration tests.
 
 ## Status
 
