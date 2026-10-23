@@ -37,6 +37,21 @@ cargo build --release
 
 The executable is available at target/release/binbox.
 
+## Releases
+
+Pushing a Git tag matching `v*` (for example, `v0.1.0`) builds Linux and macOS
+binaries for amd64 and arm64 and uploads them to a draft GitHub Release.
+Review and edit the generated release notes, then publish the release manually on GitHub.
+Each release includes `binbox-<os>-<arch>` binaries and a `SHA256SUMS` file.
+Linux release binaries are statically linked with musl and require no shared
+libraries or installed libc. macOS binaries use the system libraries.
+The binaries contain no bundled tools; make a downloaded binary executable with
+`chmod +x` before using it.
+
+To verify downloads on Linux, run `sha256sum --check --ignore-missing SHA256SUMS`.
+On macOS, run `shasum -a 256 --check --ignore-missing SHA256SUMS`.
+Run these commands from the directory containing the downloaded binaries and checksum file.
+
 ## Bundling tools
 Create a ZIP archive containing the executables you want, then append it to binbox.
 
@@ -49,7 +64,12 @@ zip -A mybox
 chmod +x mybox
 ```
 
-That's it! `mybox` is now a self-contained executable containing the tools you bundled.
+That's it! `mybox` is now a self-contained executable containing the tools you bundled. You can run them like this:
+
+```shell
+./mybox kubectl get pods
+./mybox helm version
+```
 
 The `zip -A` step adjusts ZIP offsets to account for the executable prefix.
 Without it, the ZIP reader can mistake signature bytes inside the executable for archive metadata.
