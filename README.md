@@ -1,3 +1,6 @@
+
+![binbox logo](./binbox-logo-white-bg.png)
+
 # binbox
 
 **BusyBox-inspired, bring-your-own-binaries toolbox.**
