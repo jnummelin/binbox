@@ -1,6 +1,7 @@
 use std::{
     ffi::OsString,
     os::unix::{ffi::OsStrExt, fs::PermissionsExt},
+    path::Path,
     process::ExitCode,
 };
 
@@ -8,38 +9,80 @@ const USAGE: &str = "Usage: binbox [--list | <command> [args...]]";
 const LIST_FLAG: &str = "--list";
 const HELP_FLAG: &str = "--help";
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+enum InvocationMode {
+    Launcher,
+    Tool(OsString),
+}
+
 fn main() -> ExitCode {
     let args = std::env::args_os().collect::<Vec<_>>();
 
-    let flag: Option<&OsString> = args.get(1);
+    let called_as = args
+        .first()
+        .map(|s| s.as_os_str())
+        .unwrap_or_else(|| std::ffi::OsStr::new("binbox"));
 
-    match flag {
-        None => {
-            eprintln!("{}", USAGE);
-            ExitCode::FAILURE
-        }
-        Some(flag) if flag == HELP_FLAG => {
-            println!("{}", USAGE);
-            ExitCode::SUCCESS
-        }
-        Some(flag) if flag == LIST_FLAG => {
-            // List available tools
-            if let Err(err) = list_tools() {
-                eprintln!("Failed to list tools: {}", err);
-                return ExitCode::FAILURE;
+    let executable = std::env::current_exe().unwrap_or_else(|_| Path::new("binbox").to_path_buf());
+
+    let invocation_mode = detect_invocation(called_as, &executable);
+
+    match invocation_mode {
+        InvocationMode::Launcher => {
+            let flag = args.get(1);
+            match flag {
+                None => {
+                    eprintln!("{}", USAGE);
+                    ExitCode::FAILURE
+                }
+                Some(flag) if flag == HELP_FLAG => {
+                    println!("{}", USAGE);
+                    ExitCode::SUCCESS
+                }
+                Some(flag) if flag == LIST_FLAG => {
+                    // List available tools
+                    if let Err(err) = list_tools() {
+                        eprintln!("Failed to list tools: {}", err);
+                        return ExitCode::FAILURE;
+                    }
+                    ExitCode::SUCCESS
+                }
+                Some(tool_name) => match execute_tool(tool_name, &args[2..]) {
+                    Ok(status) => match status.code() {
+                        Some(code) => ExitCode::from(code as u8),
+                        None => ExitCode::FAILURE,
+                    },
+                    Err(err) => {
+                        eprintln!("Failed to execute tool: {}", err);
+                        ExitCode::FAILURE
+                    }
+                },
             }
-            ExitCode::SUCCESS
         }
-        Some(tool_name) => match execute_tool(tool_name, &args[2..]) {
-            Ok(status) => match status.code() {
-                Some(code) => ExitCode::from(code as u8),
-                None => ExitCode::FAILURE,
-            },
-            Err(err) => {
-                eprintln!("Failed to execute tool: {}", err);
-                ExitCode::FAILURE
+        InvocationMode::Tool(tool_name) => {
+            // We're invoked as a tool, so we should execute it directly.
+            match execute_tool(&tool_name, &args[1..]) {
+                Ok(status) => match status.code() {
+                    Some(code) => ExitCode::from(code as u8),
+                    None => ExitCode::FAILURE,
+                },
+                Err(err) => {
+                    eprintln!("Failed to execute tool: {}", err);
+                    ExitCode::FAILURE
+                }
             }
-        },
+        }
+    }
+}
+
+fn detect_invocation(argv0: &std::ffi::OsStr, executable: &std::path::Path) -> InvocationMode {
+    let invoked_name = Path::new(argv0).file_name();
+    let executable_name = executable.file_name();
+
+    match invoked_name {
+        Some(name) if Some(name) == executable_name => InvocationMode::Launcher,
+        Some(name) => InvocationMode::Tool(name.to_os_string()),
+        None => InvocationMode::Launcher,
     }
 }
 
@@ -151,6 +194,43 @@ mod tests {
                 result.is_ok(),
                 expected,
                 "Unexpected validation result for {tool:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detect_invocation() {
+        let cases = [
+            ("binbox", "/usr/local/bin/binbox", InvocationMode::Launcher),
+            (
+                "./binbox",
+                "/usr/local/bin/binbox",
+                InvocationMode::Launcher,
+            ),
+            (
+                "jq",
+                "/usr/local/bin/binbox",
+                InvocationMode::Tool("jq".into()),
+            ),
+            (
+                "/usr/local/bin/jq",
+                "/usr/local/bin/binbox",
+                InvocationMode::Tool("jq".into()),
+            ),
+            ("mybox", "/usr/local/bin/mybox", InvocationMode::Launcher),
+            (
+                "kubectl",
+                "/usr/local/bin/binbox",
+                InvocationMode::Tool("kubectl".into()),
+            ),
+        ];
+
+        for (argv0, executable, expected_mode) in cases {
+            let result = detect_invocation(std::ffi::OsStr::new(argv0), Path::new(executable));
+
+            assert_eq!(
+                result, expected_mode,
+                "argv0={argv0}, executable={executable}"
             );
         }
     }
