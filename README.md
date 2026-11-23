@@ -14,6 +14,28 @@ binbox kubectl get pods
 binbox helm version
 ```
 
+## Multicall usage
+
+You can also invoke a bundled tool by creating a symlink to `mybox` whose name
+matches the tool in the archive:
+
+```shell
+ln -s mybox kubectl
+ln -s mybox helm
+```
+
+With those symlinks in `PATH`, invoke the tools directly:
+
+```shell
+kubectl get pods
+helm version
+```
+
+In multicall mode, binbox uses the invoked basename (`kubectl` or `helm`) as
+the bundled tool name. Arguments are passed directly to that tool.
+
+For example, `kubectl get pods` is equivalent to `./mybox kubectl get pods`.
+
 ## How it works
 
 binbox uses a simple trick: ZIP archives can be appended to an executable without preventing it from running.
